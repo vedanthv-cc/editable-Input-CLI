@@ -11,27 +11,31 @@ const updateLine = (line: string) => {
 // Function to handle keypress events and edit the input string
 const handleKeypress = (
   initialInput: string,
-  resolve: (value: string) => void
+  resolve: (value: string) => void,
+  cleanup: () => void
 ) => {
   let inputLine = initialInput; // Ensure initialInput is treated as a string
 
   readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
 
-  process.stdin.on("keypress", (char: string, key: { name: string }) => {
+  const keypressHandler = (char: string, key: { name: string }) => {
     if (key && key.name === "backspace") {
       inputLine = inputLine.slice(0, -1);
     } else if (key && key.name === "return") {
       process.stdin.setRawMode(false);
       console.log();
+      process.stdin.off("keypress", keypressHandler);
+      cleanup(); // Clean up to prevent memory leaks
       resolve(inputLine);
       return;
     } else if (char && char !== "\r") {
       inputLine += char;
     }
     updateLine(inputLine);
-  });
+  };
 
+  process.stdin.on("keypress", keypressHandler);
   updateLine(initialInput); // Display initial input
 };
 
@@ -43,6 +47,11 @@ export const getEditableInput = (
   return new Promise((resolve) => {
     const initialInputString = String(initialInput); // Convert to string
     console.log(`${question}`);
-    handleKeypress(initialInputString, resolve);
+
+    const cleanup = () => {
+      process.stdin.setRawMode(false);
+    };
+
+    handleKeypress(initialInputString, resolve, cleanup);
   });
 };
